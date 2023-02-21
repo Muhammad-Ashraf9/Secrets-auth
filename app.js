@@ -1,11 +1,13 @@
-require('dotenv').config()
+require("dotenv").config();
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const express = require("express");
 const mongoose = require("mongoose");
-const md5 = require("md5")
+const md5 = require("md5");
 const app = express();
 const port = 3000;
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 mongoose.set("strictQuery", false);
 
@@ -19,7 +21,6 @@ const userSchema = new mongoose.Schema({
   email: String,
   password: String,
 });
-
 
 const User = mongoose.model("User", userSchema);
 
@@ -37,13 +38,19 @@ app.get("/register", (req, res) => {
   res.render("register");
 });
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password),
-  });
-  newUser.save((err) => {
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     if (!err) {
-      res.render("secrets");
+      const newUser = new User({
+        email: req.body.username,
+        password: hash,
+      });
+      newUser.save((err) => {
+        if (!err) {
+          res.render("secrets");
+        } else {
+          console.log(err);
+        }
+      });
     } else {
       console.log(err);
     }
@@ -51,14 +58,19 @@ app.post("/register", (req, res) => {
 });
 app.post("/login", (req, res) => {
   const userName = req.body.username;
-  const password = md5(req.body.password);
-  User.findOne({ email: userName }, (err, foundUser) => {
-    if (!err) {
-      if (foundUser.password === password) {
-        res.render("secrets");
-      }
+  const password = req.body.password;
+
+  User.findOne({ email: userName }, (error, foundUser) => {
+    if (!error) {
+      bcrypt.compare(password, foundUser.password, function (err, result) {
+        if (result == true) {
+          res.render("secrets");
+        } else {
+          console.log(err);
+        }
+      });
     } else {
-      console.log(err);
+      console.log(error);
     }
   });
 });
